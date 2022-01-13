@@ -10,6 +10,12 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type message struct {
+	Author string `json:"author"`
+	Text   string `json:"text"`
+}
+
+var ChatRoom = make([]message, 0)
 var wsChan = make(chan WsPayload)
 var clients = make(map[WebSocketConneciton]string)
 
@@ -42,10 +48,10 @@ type WebSocketConneciton struct {
 
 // defines the response sent back from ws
 type WsJsonResponse struct {
-	Action         string   `json:"action"`
-	Message        string   `json:"message"`
-	MessageType    string   `json:"message_type"`
-	ConnectedUsers []string `json:"connected_users"`
+	Action         string    `json:"action"`
+	Message        []message `json:"message"`
+	MessageType    string    `json:"message_type"`
+	ConnectedUsers []string  `json:"connected_users"`
 }
 
 type WsPayload struct {
@@ -64,7 +70,12 @@ func WsEndpoint(w http.ResponseWriter, r *http.Request) {
 	log.Println("client connected to endpoint")
 
 	var response WsJsonResponse
-	response.Message = `<em><small>Connected to server</small></em>`
+	response.Message = append(ChatRoom,
+		message{
+			Author: "system",
+			Text:   `<em><small>Connected to server</small></em>`,
+		},
+	)
 
 	conn := WebSocketConneciton{Conn: ws}
 	clients[conn] = ""
@@ -101,12 +112,36 @@ func ListenToWsChannel() {
 
 	for {
 		e := <-wsChan
+
 		switch e.Action {
 		case "username":
 			//get a list of user and send it back via broadcast
 			clients[e.Conn] = e.Username
 			response.Action = "list_users"
 			response.ConnectedUsers = getUserList()
+			broadcastToAll(response)
+
+		case "left":
+
+			_ = e.Conn.Close()
+			delete(clients, e.Conn)
+			response.Action = "list_users"
+			response.ConnectedUsers = getUserList()
+			broadcastToAll(response)
+
+		case "message":
+			response.Action = "message"
+			if e.Message != "" {
+				ChatRoom = append(ChatRoom,
+					message{
+						Author: clients[e.Conn],
+						Text:   e.Message,
+					},
+				)
+				response.Message = ChatRoom
+			}
+			fmt.Printf("\n the chatroom messages are: %+v \n", response.Message)
+
 			broadcastToAll(response)
 
 		}
@@ -129,7 +164,9 @@ func broadcastToAll(response WsJsonResponse) {
 func getUserList() []string {
 	var userList []string
 	for _, x := range clients {
-		userList = append(userList, x)
+		if x != "" {
+			userList = append(userList, x)
+		}
 	}
 	sort.Strings(userList)
 	return userList
