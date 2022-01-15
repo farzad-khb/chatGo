@@ -8,7 +8,9 @@
     <title>Chat With Me!</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"
         integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/notie/4.3.1/notie.css"
+        integrity="sha512-7DgarsuahzxiOonlZeYgjXuPFVEDIylPzzlmANJdccCIO0H7ofXKbAKf0FWCkh8NkCFswe3Hpj6HegSTYH6SJQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         .chatbox {
             outline: 1px solid silver;
@@ -19,7 +21,7 @@
 </head>
 
 <body>
-    <div class="container"> 
+    <div class="container">
         <div class="row">
             <div class="col">
                 <h1 class="mt-3">This is the home page</h1>
@@ -37,13 +39,17 @@
                     <label for="message">Message:</label>
                     <input type="text" name="message" id="message" class="form-control" autocomplete="off">
                 </div>
-                <input type="hidden" name="action" id="action">
                 <hr>
-                <div id="output" class="chatbox"></div>
+                <a href="javascript:void(0);" class="btn btn-outline-secondary" id="sendBtn"> Send Message</a>
+
+                <input type="hidden" name="action" id="action">
+               
+                <div id="status" class="mt-2 float-end"> </div>
+                <div id="output" class="chatbox mt-1"></div>
             </div>
             <div class="col-md-4">
                 <h3>Who is online </h3>
-                <ul id="online_users"></ul>
+                <ul id="online_users"></ul> 
             </div>
         </div>
 
@@ -53,27 +59,41 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
     crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/notie/4.3.1/notie.min.js"
+    integrity="sha512-NHRCwRf2LnVSlLDejCA9oS3fG3/FLSQIPCjAWl3M7tVi5wszwr6FxkjotWnQDXLE+aLKcxRrzFDNEgXj9nvkPw=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="/static/reconnecting-websocket.min.js"></script>
 
 <script>
     let socket = null;
-    window.onbeforeunload = function(){
-    console.log("leaving");
-    let jsonData = {};
-    jsonData["action"] = "left";
-    socket.send(JSON.stringify(jsonData));
+    let o = document.getElementById("output");
+    let userNameField = document.getElementById("username");
+    let messageField = document.getElementById("message");
+    let statusDiv = document.getElementById("status");
+
+    window.onbeforeunload = function () {
+        console.log("leaving");
+        let jsonData = {};
+        jsonData["action"] = "left";
+        socket.send(JSON.stringify(jsonData));
     }
 
     document.addEventListener("DOMContentLoaded", function () {
-        socket = new WebSocket("ws://127.0.0.1:8080/ws");
+        socket = new ReconnectingWebSocket("ws://127.0.0.1:8080/ws", null, {debug : true, reconnectInterval : 30000} );
+        const offline = '<span class="badge bg-danger">Not connected</span>'
+        const online = '<span class="badge bg-success">Connected</span>'
+  
         socket.onopen = () => {
-            console.log("Successfully connected!")
+            console.log("Successfully connected!");
+            statusDiv.innerHTML = online;
 
         }
         socket.onclose = () => {
-            console.log("connection closed")
+            console.log("connection closed");
+            statusDiv.innerHTML = offline;
         }
         socket.onerror = error => {
-            console.log("there was an error")
+            console.log("there was an error");
         }
         socket.onmessage = msg => {
 
@@ -87,7 +107,7 @@
                     while (ul.firstChild) ul.removeChild(ul.firstChild);
 
                     if (j.connected_users.length > 0) {
-                            j.connected_users.forEach(function(item){
+                        j.connected_users.forEach(function (item) {
                             let li = document.createElement("li");
                             li.appendChild(document.createTextNode(item));
                             ul.appendChild(li);
@@ -95,16 +115,16 @@
                     }
                     break;
                 case "message":
-                    let ul1 = document.getElementById("output");
-                    while (ul1.firstChild) ul1.removeChild(ul1.firstChild);
+
+                    while (o.firstChild) o.removeChild(o.firstChild);
                     console.log(j.message)
                     if (j.message.length > 0) {
-                            j.message.forEach(function(item){
+                        j.message.forEach(function (item) {
                             let li = document.createElement("li");
                             li.appendChild(document.createTextNode(item.author));
                             li.appendChild(document.createTextNode("  :  "));
                             li.appendChild(document.createTextNode(item.text));
-                            ul1.appendChild(li);
+                            o.appendChild(li);
                         })
                     }
                     break;
@@ -112,23 +132,58 @@
 
             }
         }
-        
-        let userInput = document.getElementById("username")
-        userInput.addEventListener("change", function () {
+
+        userNameField.addEventListener("change", function () {
             let jsonData = {};
             jsonData["action"] = "username";
             jsonData["username"] = this.value;
             socket.send(JSON.stringify(jsonData));
         })
-        let message = document.getElementById("message")
-        message.addEventListener("change", function(){
-            let jsonData = {}
-            jsonData["action"] = "message";
-            jsonData["message"] = this.value;
-            socket.send(JSON.stringify(jsonData));
+
+        messageField.addEventListener("keydown", function (event) {
+            if (event.code == "Enter") {
+                if (!socket) {
+                    console.log("no connection");
+                    return false
+
+                }
+               
+                if ((userNameField.value === "") || (messageField.value === "")) {
+                    errorMessage("Please provide username and message");
+                    return false
+                } else {
+                    sendMessage();
+                }
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        })
+        document.getElementById("sendBtn").addEventListener("click", function () {
+            if ((userNameField.value === "") || (messageField.value === "")) {
+                errorMessage("Please provide username and message");
+                return false
+            } else {
+                sendMessage();
+            }
         })
 
+
     })
+    function sendMessage() {
+        let jsonData = {}
+        jsonData["action"] = "message";
+        jsonData["message"] = messageField.value;
+        jsonData["username"] = userNameField.value;
+        socket.send(JSON.stringify(jsonData));
+        messageField.value = "";
+    }
+    function errorMessage(msg) {
+        notie.alert({
+            type: 'error', // optional, default = 4, enum: [1, 2, 3, 4, 5, 'success', 'warning', 'error', 'info', 'neutral']
+            text: msg,
+        })
+
+    }
 </script>
 
 </html>

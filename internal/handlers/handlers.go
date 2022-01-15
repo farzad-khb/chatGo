@@ -5,14 +5,16 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"time"
 
 	"github.com/CloudyKit/jet/v6"
 	"github.com/gorilla/websocket"
 )
 
 type message struct {
-	Author string `json:"author"`
-	Text   string `json:"text"`
+	Time   time.Time `json:"time"`
+	Author string    `json:"author"`
+	Text   string    `json:"text"`
 }
 
 var ChatRoom = make([]message, 0)
