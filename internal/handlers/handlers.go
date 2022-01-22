@@ -11,13 +11,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type message struct {
-	Time   time.Time `json:"time"`
-	Author string    `json:"author"`
-	Text   string    `json:"text"`
-}
-
-var ChatRoom = make([]message, 0)
 var wsChan = make(chan WsPayload)
 var clients = make(map[WebSocketConneciton]string)
 
@@ -50,10 +43,10 @@ type WebSocketConneciton struct {
 
 // defines the response sent back from ws
 type WsJsonResponse struct {
-	Action         string    `json:"action"`
-	Message        []message `json:"message"`
-	MessageType    string    `json:"message_type"`
-	ConnectedUsers []string  `json:"connected_users"`
+	Action         string   `json:"action"`
+	Message        string   `json:"message"`
+	MessageType    string   `json:"message_type"`
+	ConnectedUsers []string `json:"connected_users"`
 }
 
 type WsPayload struct {
@@ -72,12 +65,7 @@ func WsEndpoint(w http.ResponseWriter, r *http.Request) {
 	log.Println("client connected to endpoint")
 
 	var response WsJsonResponse
-	response.Message = append(ChatRoom,
-		message{
-			Author: "system",
-			Text:   `<em><small>Connected to server</small></em>`,
-		},
-	)
+	response.Message = `<em><small>Connected to server</small></em>`
 
 	conn := WebSocketConneciton{Conn: ws}
 	clients[conn] = ""
@@ -134,22 +122,15 @@ func ListenToWsChannel() {
 		case "message":
 			response.Action = "message"
 			if e.Message != "" {
-				ChatRoom = append(ChatRoom,
-					message{
-						Author: clients[e.Conn],
-						Text:   e.Message,
-					},
-				)
-				response.Message = ChatRoom
+				h, m, s := time.Now().Local().Clock()
+				response.Message = fmt.Sprintf("%d:%d:%d   <strong>%s</strong>: %s", h, m, s, e.Username, e.Message)
 			}
-			fmt.Printf("\n the chatroom messages are: %+v \n", response.Message)
+			fmt.Printf("\n the messages are: %+v \n", response.Message)
 
 			broadcastToAll(response)
 
 		}
-		// response.Action = "Got it here!"
-		// response.Message = fmt.Sprintf("How u doing? the action was %s", e.Action)
-		// broadcastToAll(response)
+
 	}
 }
 func broadcastToAll(response WsJsonResponse) {

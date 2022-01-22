@@ -115,18 +115,7 @@
                     }
                     break;
                 case "message":
-
-                    while (o.firstChild) o.removeChild(o.firstChild);
-                    console.log(j.message)
-                    if (j.message.length > 0) {
-                        j.message.forEach(function (item) {
-                            let li = document.createElement("li");
-                            li.appendChild(document.createTextNode(item.author));
-                            li.appendChild(document.createTextNode("  :  "));
-                            li.appendChild(document.createTextNode(item.text));
-                            o.appendChild(li);
-                        })
-                    }
+                    o.innerHTML = o.innerHTML + j.message + "<br>";
                     break;
 
 
