@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/CloudyKit/jet"
+	"github.com/CloudyKit/jet/v6"
 	"github.com/gorilla/websocket"
 )
 
