@@ -9,7 +9,7 @@ import (
 
 func main() {
 	mux := routes()
-	port, ok := os.LookupEnv("PORT")
+	port, ok := os.LookupEnv("CHATGOPORT")
 	// default port
 	if !ok {
 		port = "8080"
